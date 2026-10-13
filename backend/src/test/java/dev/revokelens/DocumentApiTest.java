@@ -12,8 +12,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.transaction.annotation.Transactional;
+
 @SpringBootTest
 @AutoConfigureMockMvc
+@Transactional
+@Sql("/fixtures.sql")
 class DocumentApiTest {
 
     @Autowired

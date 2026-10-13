@@ -27,7 +27,9 @@ INSERT INTO organizations VALUES
 INSERT INTO app_users VALUES
     ('alice', 'atlas'),
     ('charlie', 'atlas'),
-    ('bob', 'beacon');
+    ('bob', 'beacon'),
+    ('admin-atlas', 'atlas'),
+    ('admin-beacon', 'beacon');
 
 INSERT INTO documents VALUES
     ('atlas-plan', 'atlas', 'SYNTH-ATLAS-PLAN-001'),

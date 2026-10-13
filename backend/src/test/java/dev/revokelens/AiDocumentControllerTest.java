@@ -26,6 +26,9 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.ai.chat.prompt.ChatOptions;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -40,6 +43,12 @@ class AiDocumentControllerTest {
 
     @MockitoBean
     ChatModel model;
+
+    @BeforeEach
+    void setUp() {
+        when(model.getOptions())
+                .thenReturn(ChatOptions.builder().build());
+    }
 
     private static final String REQUEST = """
             {
@@ -80,7 +89,7 @@ class AiDocumentControllerTest {
                         .content(REQUEST))
                 .andExpect(status().isNotFound());
 
-        verifyNoInteractions(model);
+        verify(model, never()).call(any(Prompt.class));
     }
 
     @Test

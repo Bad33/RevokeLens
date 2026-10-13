@@ -28,10 +28,10 @@ class ScenarioTrace {
                 subject,
                 documentId,
                 httpStatus,
-                finding.verdict().name(),
-                finding.sameOrganization(),
-                finding.activeGrant(),
-                finding.matchedEvidence()
+                finding == null ? "NOT_APPLICABLE" : finding.verdict().name(),
+                finding == null ? null : finding.sameOrganization(),
+                finding == null ? null : finding.activeGrant(),
+                finding == null ? null : finding.matchedEvidence()
         ));
     }
 
@@ -60,8 +60,8 @@ class ScenarioTrace {
             String documentId,
             Integer httpStatus,
             String verdict,
-            boolean sameOrganization,
-            boolean activeGrant,
+            Boolean sameOrganization,
+            Boolean activeGrant,
             String matchedEvidence
     ) {}
 }

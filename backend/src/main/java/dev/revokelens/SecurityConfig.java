@@ -33,6 +33,11 @@ class SecurityConfig {
                 User.withUsername("bob")
                         .password("{noop}demo")
                         .roles("READER")
+                        .build(),
+                
+                User.withUsername("charlie")
+                        .password("{noop}demo")
+                        .roles("READER")
                         .build()
         );
     }

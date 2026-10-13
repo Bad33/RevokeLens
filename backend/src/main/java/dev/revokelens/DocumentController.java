@@ -11,36 +11,24 @@ import org.springframework.web.bind.annotation.*;
 class DocumentController {
 
     private final JdbcClient jdbc;
+    private final AuthorizedDocuments documents;
 
-    DocumentController(JdbcClient jdbc) {
+    DocumentController(JdbcClient jdbc, AuthorizedDocuments documents) {
         this.jdbc = jdbc;
+        this.documents = documents;
     }
+
 
     @GetMapping("/{id}")
     ResponseEntity<String> read(
             @PathVariable String id,
             Authentication user
     ) {
-        var content = jdbc.sql("""
-                SELECT d.content
-                FROM documents d
-                JOIN app_users u
-                    ON u.organization_id = d.organization_id
-                JOIN document_grants g
-                    ON g.document_id = d.id
-                    AND g.username = u.username
-                WHERE d.id = :id
-                    AND u.username = :username
-                """)
-                .param("id", id)
-                .param("username", user.getName())
-                .query(String.class)
-                .optional();
-
-        return content
+        return documents.content(user.getName(), id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
+
 
     @DeleteMapping("/{id}/grants/{username}")
     ResponseEntity<Void> revoke(

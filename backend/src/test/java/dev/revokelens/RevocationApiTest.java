@@ -15,10 +15,12 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.test.context.jdbc.Sql;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@Sql("/fixtures.sql")
 class RevocationApiTest {
 
     private static final String GRANT_URL =

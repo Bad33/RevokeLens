@@ -9,8 +9,6 @@ import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
-
 import static dev.revokelens.AuthorizationOracle.Verdict.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
@@ -30,80 +28,71 @@ class AuthorizationOracleTest {
     AuthorizationOracle oracle;
 
     @Test
-    void detectsStaleCacheDisclosureAfterRevocation() throws Exception {
+    void detectsCacheLeakAfterRevocation() throws Exception {
+        var cache = new VulnerableDocumentCache(mvc);
 
-        // 1. Alice reads the document while authorized.
-        String originalResponse = mvc.perform(
-                get("/api/documents/atlas-plan")
-                        .with(httpBasic("alice", "demo")))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+        // Alice retrieves the document while authorized.
+        String original = cache.read("alice", "atlas-plan");
 
-        var before = oracle.inspect(
-                "alice", "atlas-plan", originalResponse);
+        assertNotNull(original);
+        assertEquals(AUTHORIZED_DISCLOSURE,
+                oracle.inspect("alice", "atlas-plan", original).verdict());
 
-        assertEquals(AUTHORIZED_DISCLOSURE, before.verdict());
-
-        // 2. Simulate a faulty cache that stores the response
-        // without binding it to the current authorization state.
-        Map<String, String> staleCache =
-                Map.of("atlas-plan", originalResponse);
-
-        // 3. Administrator revokes Alice's permission.
+        // Administrator revokes Alice's grant.
         mvc.perform(delete("/api/documents/atlas-plan/grants/alice")
                         .with(httpBasic("admin-atlas", "demo"))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
 
-        // 4. The secure API now refuses access.
-        String secureResponse = mvc.perform(
-                get("/api/documents/atlas-plan")
+        // The secure API correctly denies subsequent access.
+        mvc.perform(get("/api/documents/atlas-plan")
                         .with(httpBasic("alice", "demo")))
-                .andExpect(status().isNotFound())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+                .andExpect(status().isNotFound());
 
-        assertEquals(NO_DISCLOSURE,
-                oracle.inspect(
-                        "alice", "atlas-plan", secureResponse
-                ).verdict());
+        // The faulty cache still returns the stored response.
+        String leaked = cache.read("alice", "atlas-plan");
 
-        // 5. The deliberately broken cache emits old content again.
-        String leakedResponse = staleCache.get("atlas-plan");
+        var finding = oracle.inspect("alice", "atlas-plan", leaked);
 
-        var finding = oracle.inspect(
-                "alice", "atlas-plan", leakedResponse);
-
-        // 6. The oracle must identify the violation.
         assertEquals(UNAUTHORIZED_DISCLOSURE, finding.verdict());
-        assertTrue(finding.sameOrganization());
         assertFalse(finding.activeGrant());
         assertEquals("SYNTH-ATLAS-PLAN-001", finding.matchedEvidence());
 
-        System.out.println("RevokeLens finding: " + finding);
+        System.out.println("Revocation finding: " + finding);
     }
 
     @Test
-    void detectsCrossOrganizationDisclosure() {
+    void detectsCrossOrganizationCacheLeak() throws Exception {
+        var cache = new VulnerableDocumentCache(mvc);
 
-        // Simulate a faulty application emitting Atlas content to Bob.
-        var finding = oracle.inspect(
-                "bob",
-                "atlas-plan",
-                "SYNTH-ATLAS-PLAN-001"
-        );
+        // Alice populates the cache.
+        assertNotNull(cache.read("alice", "atlas-plan"));
+
+        // Bob receives Atlas's cached content.
+        String leaked = cache.read("bob", "atlas-plan");
+
+        var finding = oracle.inspect("bob", "atlas-plan", leaked);
 
         assertEquals(UNAUTHORIZED_DISCLOSURE, finding.verdict());
         assertFalse(finding.sameOrganization());
-        assertFalse(finding.activeGrant());
+
+        System.out.println("Cross-tenant finding: " + finding);
     }
 
     @Test
-    void doesNotFlagHarmlessResponses() {
+    void cacheMissStillRespectsAuthorization() throws Exception {
+        var cache = new VulnerableDocumentCache(mvc);
 
+        // Bob cannot read Atlas's document on a cold cache.
+        String response = cache.read("bob", "atlas-plan");
+
+        assertNull(response);
+        assertEquals(NO_DISCLOSURE,
+                oracle.inspect("bob", "atlas-plan", response).verdict());
+    }
+
+    @Test
+    void harmlessResponseDoesNotTriggerViolation() {
         var finding = oracle.inspect(
                 "alice",
                 "atlas-plan",
